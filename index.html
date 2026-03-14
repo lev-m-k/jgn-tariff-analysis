@@ -144,6 +144,7 @@ tfoot td{background:#080f18;font-weight:700;font-size:12px}
   <button class="tab-btn" onclick="switchTab('modelling',this)">02 · Revenue Modelling</button>
   <button class="tab-btn" onclick="switchTab('policy',this)">03 · Policy Evaluation</button>
 </div>
+<div id="tab-info" style="padding:8px 36px;font-family:'Courier New',monospace;font-size:10px;color:#475569;letter-spacing:.04em;border-bottom:1px solid #1e2d3d">Step-by-step walkthrough of how WAPC and the cap-and-collar hybrid mechanism work</div>
 
 <!-- ══════ TAB 1 · MECHANISM ══════ -->
 <div class="tab-panel active" id="tab-mechanism">
@@ -323,6 +324,12 @@ function switchTab(id, btn) {
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('tab-'+id).classList.add('active');
   btn.classList.add('active');
+  var info = document.getElementById('tab-info');
+  if (info) info.textContent = {
+    mechanism: 'Step-by-step walkthrough of how WAPC and the cap-and-collar hybrid mechanism work',
+    modelling:  'Adjust revenue assumptions and see true-up outcomes under the hybrid mechanism',
+    policy:     'Analysis of the hybrid against each limb of the National Gas Objective'
+  }[id] || '';
   if (id === 'modelling') render();
   if (id === 'policy' && !policyBuilt) buildPolicy();
 }
