@@ -273,18 +273,18 @@ tfoot td{background:#080f18;font-weight:700;font-size:12px}
         <div class="chart-legend"><span><span class="legend-dot" style="background:#fbbf24"></span>WAPC</span><span><span class="legend-dot" style="background:#ef4444"></span>Hybrid</span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-        <div class="mono muted" style="font-size:10px;padding:6px 10px;background:#080f18;border-radius:4px;border-left:2px solid #fbbf2460">Under WAPC, JGN absorbs 100% of any revenue deviation.</div>
-        <div class="mono muted" style="font-size:10px;padding:6px 10px;background:#080f18;border-radius:4px;border-left:2px solid #ef444460">Under Hybrid, deviations within ±5% RR are also fully borne by JGN — only outside the band does 50% transfer.</div>
+        <div class="mono muted" style="font-size:10px;padding:6px 10px;background:#080f18;border-radius:4px;border-left:2px solid #fbbf2460">Under WAPC, JGN absorbs 100% of revenue deviation.</div>
+        <div class="mono muted" style="font-size:10px;padding:6px 10px;background:#080f18;border-radius:4px;border-left:2px solid #ef444460">Under Hybrid, JGN absorbs 100% of revenue deviation within ±5% RR. Outside of the band, 50% is transferred.</div>
       </div>
       <svg id="c3" viewBox="0 0 700 170" style="width:100%;height:170px;display:block"></svg>
       <div class="pills" id="pills"></div>
     </div>
     <div class="table-wrap">
-      <div class="table-head"><div class="section-label" style="margin-bottom:0">Annual Modelling Output · Hybrid</div></div>
+      <div class="table-head"><div class="section-label" style="margin-bottom:0">Modelling Output · Hybrid</div></div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th style="text-align:left">Year</th><th>Allowed $M</th><th>Actual $M</th><th>Rev. Ratio</th><th>Band Breach</th><th>Overshoot $M</th><th>Undershoot $M</th><th>True-Up $M</th></tr></thead>
+        <thead><tr><th style="text-align:left">Year</th><th>Allowed $M</th><th>Actual $M</th><th>Recovered $M</th><th>Rev. Ratio</th><th>Band Breach</th><th>Overshoot $M</th><th>Undershoot $M</th><th>True-Up $M</th></tr></thead>
         <tbody id="tbody"></tbody>
-        <tfoot><tr><td colspan="7" style="text-align:left;font-size:10px;color:#475569;font-weight:400">NET PERIOD TRUE-UP</td><td id="totalCell" style="color:#334155">—</td></tr></tfoot>
+        <tfoot><tr><td style="text-align:left;font-size:10px;color:#475569;font-weight:400">TOTAL</td><td id="totalAl" style="color:#94a3b8">—</td><td id="totalAc" style="color:#94a3b8">—</td><td id="totalRv" style="color:#a78bfa">—</td><td colspan="4"></td><td id="totalCell" style="color:#334155">—</td></tr></tfoot>
       </table></div>
     </div>
   </div>
@@ -733,7 +733,8 @@ function getMetrics(actual,allowed){
     var ov=rr>1+BAND?ac-al*(1+BAND):0,un=rr<1-BAND?al*(1-BAND)-ac:0;
     var hit=ov>0||un>0,tu=hit?(un>0?0.5*un:-0.5*ov):0;
     var we=ac-al,he=!hit?ac-al:ov>0?al*BAND+0.5*ov:-al*BAND-0.5*un;
-    res.push({year:YEARS[i],al:rnd(al,1),ac:rnd(ac,1),rr:rnd(rr*100,2),ov:rnd(ov,1),un:rnd(un,1),hit:hit,tu:rnd(tu,1),we:rnd(we,1),he:rnd(he,1)});
+    var rv=rnd(ac+tu,1);
+    res.push({year:YEARS[i],al:rnd(al,1),ac:rnd(ac,1),rr:rnd(rr*100,2),ov:rnd(ov,1),un:rnd(un,1),hit:hit,tu:rnd(tu,1),we:rnd(we,1),he:rnd(he,1),rv:rv});
   }
   return res;
 }
@@ -748,14 +749,22 @@ function ah(el,fn){el.addEventListener('mouseenter',fn);el.addEventListener('mou
 function drawC1(m){
   var svg=document.getElementById('c1');svg.innerHTML='';
   var W=700,H=260,PL=54,PR=60,PT=16,PB=28,cW=W-PL-PR,cH=H-PT-PB;
-  // Compute recovered revenue per year (actual + true-up)
-  var rec=m.map(function(d){return d.ac+d.tu;});
-  // Dynamic y-axis: 0 to ceil(max of al, ac, rec / 100)*100
+  // Dynamic y-axis
   var rawMax=0;
-  m.forEach(function(d,i){rawMax=Math.max(rawMax,d.al,d.ac,rec[i]);});
+  m.forEach(function(d){rawMax=Math.max(rawMax,d.al,d.ac,d.rv);});
   var step=100,VX=Math.ceil(rawMax/step)*step;if(VX===0)VX=step;
   function ys(v){return PT+cH-(v/VX)*cH;}
   var y0=ys(0);
+  // Define stripe patterns for orange and green true-up
+  var defs=se('defs',{});
+  ['orange','green'].forEach(function(name){
+    var col=name==='orange'?'#f97316':'#4ade80';
+    var pat=se('pattern',{id:'stripe-'+name,patternUnits:'userSpaceOnUse',width:'6',height:'6',patternTransform:'rotate(45)'});
+    pat.appendChild(se('rect',{width:'6',height:'6',fill:'transparent'}));
+    pat.appendChild(se('line',{x1:'0',y1:'0',x2:'0',y2:'6',stroke:col,'stroke-width':'2.5','stroke-opacity':'0.85'}));
+    defs.appendChild(pat);
+  });
+  svg.appendChild(defs);
   // Gridlines + y-axis labels
   for(var gv=step;gv<=VX;gv+=step){
     svg.appendChild(se('line',{x1:PL,y1:ys(gv),x2:W-PR,y2:ys(gv),stroke:'#1e2d3d','stroke-width':'1','stroke-dasharray':'4 3'}));
@@ -766,27 +775,28 @@ function drawC1(m){
   var gW=cW/5,bW=Math.floor(gW*0.42);
   m.forEach(function(d,i){
     var cx=PL+gW*i+gW/2;
-    var rv=rec[i],tu=d.tu;
+    var rv=d.rv,tu=d.tu;
     // Actual revenue bar (pink)
     var acTop=ys(d.ac);
     svg.appendChild(se('rect',{x:cx-bW/2,y:acTop,width:bW,height:y0-acTop,fill:'#f472b6',rx:'2'}));
-    // True-up waterfall segment stacked on bar
+    // True-up waterfall segment — diagonal stripes over transparent gap so pink shows through
     if(tu!==0){
+      var patName=tu>0?'stripe-orange':'stripe-green';
       var tuCol=tu>0?'#f97316':'#4ade80';
       var tuTop=tu>0?ys(rv):acTop;
       var tuBot=tu>0?acTop:ys(rv);
-      svg.appendChild(se('rect',{x:cx-bW/2,y:tuTop,width:bW,height:tuBot-tuTop,fill:tuCol,rx:'2','fill-opacity':'0.85'}));
-      // True-up value label
+      svg.appendChild(se('rect',{x:cx-bW/2,y:tuTop,width:bW,height:tuBot-tuTop,fill:'url(#'+patName+')',rx:'2'}));
+      // Thin coloured border so the segment reads clearly
+      svg.appendChild(se('rect',{x:cx-bW/2,y:tuTop,width:bW,height:tuBot-tuTop,fill:'none',stroke:tuCol,'stroke-width':'1',rx:'2'}));
       var tuLy=tu>0?tuTop-5:tuBot+12;
       svg.appendChild(st(cx,tuLy,(tu>0?'+':'')+tu.toFixed(1),{'text-anchor':'middle',fill:tuCol,'font-size':'9','font-weight':'700'}));
     }
-    // Allowed revenue horizontal line (teal) — spans bar width + small overhang
+    // Allowed revenue horizontal line (teal)
     var ovh=8;
     svg.appendChild(se('line',{x1:cx-bW/2-ovh,y1:ys(d.al),x2:cx+bW/2+ovh,y2:ys(d.al),stroke:'#00b4d8','stroke-width':'2.5'}));
-    // Recovered revenue dot (purple) — centred on bar top
+    // Recovered revenue dot (purple)
     var rcy=ys(rv);
     svg.appendChild(se('circle',{cx:cx,cy:rcy,r:'4',fill:'#a78bfa','stroke':'#080f18','stroke-width':'1.5'}));
-    // Connector line from bar top to recovered dot if they differ
     if(Math.abs(tu)>0.05){
       svg.appendChild(se('line',{x1:cx,y1:acTop,x2:cx,y2:rcy,stroke:'#a78bfa40','stroke-width':'1','stroke-dasharray':'2 2'}));
     }
@@ -797,7 +807,7 @@ function drawC1(m){
       var hov=se('rect',{x:cx-gW/2+2,y:PT,width:gW-4,height:cH,fill:'transparent',style:'cursor:default'});
       var tuCol=tu>0?'#f97316':'#4ade80';
       ah(hov,function(ev){
-        var tip='<span style="color:#64b5f6;font-weight:700">'+d.year+'</span>'
+        var tip='<span style="color:#94a3b8;font-weight:700">'+d.year+'</span>'
           +'<br><span style="color:#00b4d8">Allowed</span> <b>$'+d.al.toFixed(1)+'M</b>'
           +'<br><span style="color:#f472b6">Actual</span> <b>$'+d.ac.toFixed(1)+'M</b>';
         if(tu!==0) tip+='<br><span style="color:'+tuCol+'">True-up</span> <b>'+(tu>0?'+':'')+tu.toFixed(1)+'M</b>'
@@ -826,7 +836,7 @@ function drawC3(m){
     svg.appendChild(se('rect',{x:cx+gap,y:hY,width:bW,height:hH,fill:hF,rx:'2'}));
     (function(d,cx,gW){var rt=d.we-d.he,rC=rt>0.05?'#4ade80':rt<-0.05?'#f97316':'#64748b';
     var hov=se('rect',{x:cx-gW/2+2,y:PT,width:gW-4,height:cH,fill:'transparent',style:'cursor:default'});
-    ah(hov,function(ev){showTT(ev,'<span style="color:#64b5f6;font-weight:700">'+d.year+'</span><br><span style="color:#fbbf24">WAPC</span> <b>'+(d.we>=0?'+':'')+d.we.toFixed(1)+'M</b><br><span style="color:#ef4444">Hybrid</span> <b>'+(d.he>=0?'+':'')+d.he.toFixed(1)+'M</b><br><span style="color:'+rC+'">Transferred</span> <b>'+(rt>=0?'+':'')+rt.toFixed(1)+'M</b>');});svg.appendChild(hov);})(d,cx,gW);
+    ah(hov,function(ev){showTT(ev,'<span style="color:#94a3b8;font-weight:700">'+d.year+'</span><br><span style="color:#fbbf24">WAPC</span> <b>'+(d.we>=0?'+':'')+d.we.toFixed(1)+'M</b><br><span style="color:#ef4444">Hybrid</span> <b>'+(d.he>=0?'+':'')+d.he.toFixed(1)+'M</b><br><span style="color:'+rC+'">Transferred</span> <b>'+(rt>=0?'+':'')+rt.toFixed(1)+'M</b>');});svg.appendChild(hov);})(d,cx,gW);
     svg.appendChild(st(cx,H-6,d.year,{'text-anchor':'middle',fill:'#64748b','font-size':'11'}));
   });
 }
@@ -839,24 +849,29 @@ function drawPills(m){
   mk('Risk Transferred',tr,'JGN → consumers',tr>0.05?'#4ade80':tr<-0.05?'#f97316':'#94a3b8');
 }
 function drawTable(m){
-  var body=document.getElementById('tbody');body.innerHTML='';var total=0;
+  var body=document.getElementById('tbody');body.innerHTML='';
+  var tAl=0,tAc=0,tRv=0,tTu=0;
   m.forEach(function(d){
-    total+=d.tu;
+    tAl+=d.al;tAc+=d.ac;tRv+=d.rv;tTu+=d.tu;
     var rc=d.rr>105?'#4ade80':d.rr<95?'#f97316':'#64748b',tc=d.tu===0?'#334155':d.tu>0?'#fb923c':'#4ade80';
     var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+d.year+'</td><td style="color:#00b4d8">'+d.al.toFixed(1)+'</td><td style="color:#f472b6;font-weight:600">'+d.ac.toFixed(1)+'</td><td style="color:'+rc+';font-weight:700">'+d.rr.toFixed(2)+'%</td><td><span style="font-size:10px;font-weight:700;color:'+(d.hit?rc:'#334155')+';background:'+(d.hit?rc+'18':'transparent')+';border:1px solid '+(d.hit?rc+'40':'transparent')+';border-radius:3px;padding:1px 6px">'+(d.hit?'YES':'NO')+'</span></td><td style="color:'+(d.ov>0?'#4ade80':'#334155')+'">'+(d.ov>0?'('+d.ov.toFixed(1)+')':'—')+'</td><td style="color:'+(d.un>0?'#f97316':'#334155')+'">'+(d.un>0?d.un.toFixed(1):'—')+'</td><td style="color:'+tc+';font-weight:700">'+(d.tu===0?'—':d.tu>0?'+'+d.tu.toFixed(1):'('+Math.abs(d.tu).toFixed(1)+')')+'</td>';
+    tr.innerHTML='<td>'+d.year+'</td><td style="color:#00b4d8">'+d.al.toFixed(1)+'</td><td style="color:#f472b6;font-weight:600">'+d.ac.toFixed(1)+'</td><td style="color:#a78bfa;font-weight:600">'+d.rv.toFixed(1)+'</td><td style="color:'+rc+';font-weight:700">'+d.rr.toFixed(2)+'%</td><td><span style="font-size:10px;font-weight:700;color:'+(d.hit?rc:'#334155')+';background:'+(d.hit?rc+'18':'transparent')+';border:1px solid '+(d.hit?rc+'40':'transparent')+';border-radius:3px;padding:1px 6px">'+(d.hit?'YES':'NO')+'</span></td><td style="color:'+(d.ov>0?'#64748b':'#334155')+'">'+(d.ov>0?'('+d.ov.toFixed(1)+')':'—')+'</td><td style="color:'+(d.un>0?'#64748b':'#334155')+'">'+(d.un>0?d.un.toFixed(1):'—')+'</td><td style="color:'+tc+';font-weight:700">'+(d.tu===0?'—':d.tu>0?'+'+d.tu.toFixed(1):'('+Math.abs(d.tu).toFixed(1)+')')+'</td>';
     body.appendChild(tr);
   });
-  total=rnd(total,1);var te=document.getElementById('totalCell');
-  te.style.color=total===0?'#334155':total>0?'#fb923c':'#4ade80';
-  te.textContent=total===0?'—':total>0?'+'+total.toFixed(1):'('+Math.abs(total).toFixed(1)+')';
+  tAl=rnd(tAl,1);tAc=rnd(tAc,1);tRv=rnd(tRv,1);tTu=rnd(tTu,1);
+  var tAlEl=document.getElementById('totalAl');tAlEl.textContent=tAl.toFixed(1);tAlEl.style.color='#00b4d8';
+  var tAcEl=document.getElementById('totalAc');tAcEl.textContent=tAc.toFixed(1);tAcEl.style.color='#f472b6';
+  document.getElementById('totalRv').textContent=tRv.toFixed(1);
+  var te=document.getElementById('totalCell');
+  te.style.color=tTu===0?'#334155':tTu>0?'#fb923c':'#4ade80';
+  te.textContent=tTu===0?'—':tTu>0?'+'+tTu.toFixed(1):'('+Math.abs(tTu).toFixed(1)+')';
 }
 function updateNet(m){
   var total=0;m.forEach(function(d){total+=d.tu;});total=rnd(total,1);
   var card=document.getElementById('netCard'),valEl=document.getElementById('netVal'),desc=document.getElementById('netDesc');
   if(total===0){card.style.background='#0d1b2a';card.style.borderColor='#1e3a4f';valEl.style.color='#94a3b8';valEl.innerHTML='—<span class="net-unit">$M</span>';desc.textContent='No true-up triggered';}
-  else if(total>0){card.style.background='#1c0e00';card.style.borderColor='#92400e60';valEl.style.color='#fb923c';valEl.innerHTML='+'+total.toFixed(1)+'<span class="net-unit">$M</span>';desc.textContent='Net recovery from customers';}
-  else{card.style.background='#0a2819';card.style.borderColor='#14532d60';valEl.style.color='#4ade80';valEl.innerHTML='('+Math.abs(total).toFixed(1)+')<span class="net-unit">$M</span>';desc.textContent='Net credit to customers';}
+  else if(total>0){card.style.background='#1c0e00';card.style.borderColor='#92400e60';valEl.style.color='#fb923c';valEl.innerHTML='+'+total.toFixed(1)+'<span class="net-unit">$M</span>';desc.textContent='Net recovery from consumers';}
+  else{card.style.background='#0a2819';card.style.borderColor='#14532d60';valEl.style.color='#4ade80';valEl.innerHTML='('+Math.abs(total).toFixed(1)+')<span class="net-unit">$M</span>';desc.textContent='Net credit to consumers';}
 }
 function updateSliderBand(yr){
   // 95–105 on a 50–150 scale: left=(95-50)/100=45%, width=10/100=10%
@@ -1009,7 +1024,7 @@ function showAnalysis(id) {
   var d=analyses[id];
   document.getElementById('ap-empty').style.display='none';
   var card=document.getElementById('ap-card');card.style.display='block';
-  card.innerHTML='<div style="border:1px solid '+d.color+'30;border-radius:10px;overflow:hidden;animation:fadeIn .2s ease"><div class="ap-header"><div class="ap-accent" style="background:'+d.color+';height:42px"></div><div><div class="ap-title">'+d.title+'</div><div class="ap-ngo-ref">'+d.ngoRef+'</div></div><span class="ap-verdict" style="background:'+d.color+'18;color:'+d.color+';border:1px solid '+d.color+'40">'+d.verdict+'</span></div><div class="ap-col"><span class="ap-col-label" style="background:#1e2d3d;color:#64748b;border:1px solid #33415560">'+d.aerTitle+'</span><div class="ap-text">'+d.aerBody+'</div><div class="ap-cite">'+d.aerCite+'</div></div><div class="ap-col"><span class="ap-col-label" style="background:'+d.color+'18;color:'+d.color+';border:1px solid '+d.color+'40">'+d.analysisTitle+'</span><div class="ap-text">'+d.analysisBody+'</div><div class="ap-cite">'+d.analysisNote+'</div></div></div>';
+  card.innerHTML='<div style="border:1px solid '+d.color+'30;border-radius:10px;overflow:hidden;animation:fadeIn .2s ease"><div class="ap-header"><div class="ap-accent" style="background:'+d.color+';height:42px"></div><div><div class="ap-title">'+d.title+'</div><div class="ap-ngo-ref">'+d.ngoRef+'</div></div><span class="ap-verdict" style="background:'+d.color+'18;color:'+d.color+';border:1px solid '+d.color+'40">'+d.verdict+'</span></div><div class="ap-col"><span class="ap-col-label" style="background:'+d.color+'18;color:'+d.color+';border:1px solid '+d.color+'40">'+d.aerTitle+'</span><div class="ap-text">'+d.aerBody+'</div><div class="ap-cite">'+d.aerCite+'</div></div><div class="ap-col"><span class="ap-col-label" style="background:'+d.color+'18;color:'+d.color+';border:1px solid '+d.color+'40">'+d.analysisTitle+'</span><div class="ap-text">'+d.analysisBody+'</div><div class="ap-cite">'+d.analysisNote+'</div></div></div>';
 }
 </script>
 </body>
